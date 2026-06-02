@@ -1,0 +1,716 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SNR Curve Plotter</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: 'Segoe UI', Arial, sans-serif;
+            background: #1a1a2e;
+            color: #e0e0e0;
+            height: 100vh;
+            display: flex;
+            overflow: hidden;
+        }
+
+        /* ===== Left Panel ===== */
+        .sidebar {
+            width: 380px;
+            min-width: 380px;
+            background: #16213e;
+            padding: 20px;
+            overflow-y: auto;
+            border-right: 2px solid #0f3460;
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+        .sidebar h2 {
+            font-size: 20px;
+            color: #e94560;
+            margin-bottom: 4px;
+        }
+        .sidebar h3 {
+            font-size: 14px;
+            color: #a0a0b0;
+            margin-bottom: 8px;
+            border-bottom: 1px solid #0f3460;
+            padding-bottom: 6px;
+        }
+
+        /* Data Source */
+        .data-source {
+            background: #1a1a3e;
+            border: 1px solid #0f3460;
+            border-radius: 8px;
+            padding: 12px;
+        }
+        .data-source label {
+            font-size: 13px;
+            color: #b0b0c0;
+            display: block;
+            margin-bottom: 6px;
+        }
+        .data-source input[type="text"] {
+            width: 100%;
+            padding: 6px 10px;
+            border: 1px solid #0f3460;
+            border-radius: 4px;
+            background: #0d1b3e;
+            color: #e0e0e0;
+            font-size: 13px;
+            margin-bottom: 8px;
+        }
+        .data-source textarea {
+            width: 100%;
+            height: 140px;
+            padding: 8px;
+            border: 1px solid #0f3460;
+            border-radius: 4px;
+            background: #0d1b3e;
+            color: #e0e0e0;
+            font-family: 'Consolas', 'Courier New', monospace;
+            font-size: 12px;
+            resize: vertical;
+        }
+        .data-source select {
+            width: 100%;
+            padding: 6px 10px;
+            border: 1px solid #0f3460;
+            border-radius: 4px;
+            background: #0d1b3e;
+            color: #e0e0e0;
+            font-size: 13px;
+            margin-bottom: 8px;
+        }
+        .btn-row {
+            display: flex;
+            gap: 8px;
+            margin-top: 8px;
+        }
+        .btn {
+            padding: 6px 14px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 13px;
+            font-weight: 600;
+            transition: all 0.2s;
+        }
+        .btn-primary {
+            background: #e94560;
+            color: #fff;
+        }
+        .btn-primary:hover {
+            background: #ff6b81;
+        }
+        .btn-secondary {
+            background: #0f3460;
+            color: #e0e0e0;
+        }
+        .btn-secondary:hover {
+            background: #1a4a8a;
+        }
+        .btn-danger {
+            background: #8b0000;
+            color: #fff;
+        }
+        .btn-danger:hover {
+            background: #b22222;
+        }
+
+        /* Legend List */
+        .legend-list {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+        .legend-item {
+            background: #1a1a3e;
+            border: 1px solid #0f3460;
+            border-radius: 6px;
+            padding: 10px 12px;
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+        .legend-item-header {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .legend-item-header input[type="checkbox"] {
+            accent-color: #e94560;
+            width: 16px;
+            height: 16px;
+            cursor: pointer;
+        }
+        .legend-item-header .color-dot {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            flex-shrink: 0;
+        }
+        .legend-item-header input[type="text"] {
+            flex: 1;
+            padding: 4px 8px;
+            border: 1px solid #0f3460;
+            border-radius: 4px;
+            background: #0d1b3e;
+            color: #e0e0e0;
+            font-size: 13px;
+        }
+        .legend-item .style-row {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 12px;
+            color: #a0a0b0;
+            flex-wrap: wrap;
+        }
+        .style-row input[type="color"] {
+            width: 28px;
+            height: 24px;
+            border: 1px solid #0f3460;
+            border-radius: 4px;
+            background: none;
+            cursor: pointer;
+        }
+        .style-row select {
+            padding: 3px 6px;
+            border: 1px solid #0f3460;
+            border-radius: 4px;
+            background: #0d1b3e;
+            color: #e0e0e0;
+            font-size: 12px;
+        }
+        .style-row input[type="number"] {
+            width: 44px;
+            padding: 3px 4px;
+            border: 1px solid #0f3460;
+            border-radius: 4px;
+            background: #0d1b3e;
+            color: #e0e0e0;
+            font-size: 12px;
+        }
+        .btn-remove {
+            background: none;
+            border: none;
+            color: #e94560;
+            cursor: pointer;
+            font-size: 16px;
+            padding: 0 4px;
+            line-height: 1;
+        }
+        .btn-remove:hover {
+            color: #ff6b81;
+        }
+
+        /* Chart Settings */
+        .chart-settings {
+            background: #1a1a3e;
+            border: 1px solid #0f3460;
+            border-radius: 8px;
+            padding: 12px;
+        }
+        .chart-settings label {
+            font-size: 13px;
+            color: #b0b0c0;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 6px;
+        }
+        .chart-settings input[type="text"] {
+            width: 100%;
+            padding: 6px 10px;
+            border: 1px solid #0f3460;
+            border-radius: 4px;
+            background: #0d1b3e;
+            color: #e0e0e0;
+            font-size: 13px;
+            margin-bottom: 8px;
+        }
+
+        /* ===== Right Chart Area ===== */
+        .main {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            padding: 20px;
+            gap: 12px;
+        }
+        .chart-container {
+            flex: 1;
+            background: #fff;
+            border-radius: 10px;
+            padding: 20px;
+            position: relative;
+            min-height: 0;
+        }
+        .chart-container canvas {
+            width: 100% !important;
+            height: 100% !important;
+        }
+
+        /* Scrollbar */
+        .sidebar::-webkit-scrollbar {
+            width: 6px;
+        }
+        .sidebar::-webkit-scrollbar-track {
+            background: #16213e;
+        }
+        .sidebar::-webkit-scrollbar-thumb {
+            background: #0f3460;
+            border-radius: 3px;
+        }
+    </style>
+</head>
+<body>
+
+<!-- ===== Left Panel ===== -->
+<div class="sidebar">
+    <h2>SNR Curve Plotter</h2>
+
+    <!-- Data Input -->
+    <h3>Data Input</h3>
+    <div class="data-source">
+        <label>Data Type</label>
+        <select id="dataType">
+            <option value="json">result.json (snr_results)</option>
+            <option value="txt">TXT (x, y)</option>
+        </select>
+
+        <label>Legend Name</label>
+        <input type="text" id="legendName" placeholder="e.g. Model A" value="">
+
+        <label>Paste Data</label>
+        <div id="jsonHint" style="font-size:11px; color:#8ac926; margin-bottom:6px; line-height:1.4;">
+            Paste the entire result.json file. The tool will auto-extract "snr_results" data.
+        </div>
+        <div id="txtHint" style="font-size:11px; color:#8ac926; margin-bottom:6px; line-height:1.4; display:none;">
+            Paste TXT data, one point per line: x, y
+        </div>
+        <textarea id="dataInput" placeholder='Paste the full result.json content here, e.g.:
+{
+  "model": "xxx",
+  "snr_results": {
+    "-20": 0.095,
+    "-18": 0.096,
+    ...
+  }
+}
+
+The tool will automatically find "snr_results" and plot it.'></textarea>
+
+        <div class="btn-row">
+            <button class="btn btn-primary" onclick="addData()">+ Add Data</button>
+            <button class="btn btn-secondary" onclick="clearInput()">Clear</button>
+        </div>
+    </div>
+
+    <!-- Legend List -->
+    <h3>Legend Management</h3>
+    <div class="legend-list" id="legendList">
+        <div style="color:#666; font-size:13px; text-align:center; padding:20px 0;">
+            No data yet. Add data above.
+        </div>
+    </div>
+
+    <!-- Chart Settings -->
+    <h3>Chart Settings</h3>
+    <div class="chart-settings">
+        <label>X Axis Title</label>
+        <input type="text" id="xLabel" value="SNR (dB)" oninput="updateChart()">
+        <label>Y Axis Title</label>
+        <input type="text" id="yLabel" value="Accuracy (%)" oninput="updateChart()">
+        <label>
+            <input type="checkbox" id="showGrid" checked onchange="updateChart()">
+            Show Grid Lines
+        </label>
+        <label>
+            <input type="checkbox" id="showMarkers" checked onchange="updateChart()">
+            Show Data Markers
+        </label>
+        <div style="margin-top:8px;">
+            <label>Y Axis Range</label>
+            <div style="display:flex; gap:8px; align-items:center;">
+                <input type="number" id="yMin" placeholder="Auto" style="width:70px;padding:4px;border:1px solid #0f3460;border-radius:4px;background:#0d1b3e;color:#e0e0e0;font-size:12px;" oninput="updateChart()">
+                <span>~</span>
+                <input type="number" id="yMax" placeholder="Auto" style="width:70px;padding:4px;border:1px solid #0f3460;border-radius:4px;background:#0d1b3e;color:#e0e0e0;font-size:12px;" oninput="updateChart()">
+            </div>
+        </div>
+    </div>
+
+    <div class="btn-row">
+        <button class="btn btn-secondary" onclick="exportImage()">Export PNG</button>
+        <button class="btn btn-danger" onclick="clearAll()">Clear All</button>
+    </div>
+</div>
+
+<!-- ===== Right Chart Area ===== -->
+<div class="main">
+    <div class="chart-container">
+        <canvas id="snrChart"></canvas>
+    </div>
+</div>
+
+<script>
+// ===== Preset Colors =====
+const COLORS = [
+    '#e94560', '#0f3460', '#00b4d8', '#e9c46a', '#2a9d8f',
+    '#e76f51', '#6a4c93', '#1982c4', '#8ac926', '#ff595e',
+    '#ffca3a', '#6a994e', '#bc4749', '#f4845f', '#7209b7',
+    '#3a0ca3', '#4361ee', '#4cc9f0', '#f72585', '#b5179e'
+];
+
+// ===== Data Storage =====
+let datasets = [];
+let chart = null;
+let colorIndex = 0;
+
+// ===== Init Chart =====
+function initChart() {
+    const ctx = document.getElementById('snrChart').getContext('2d');
+    chart = new Chart(ctx, {
+        type: 'line',
+        data: { datasets: [] },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            animation: { duration: 300 },
+            interaction: {
+                mode: 'nearest',
+                intersect: false
+            },
+            scales: {
+                x: {
+                    type: 'linear',
+                    title: {
+                        display: true,
+                        text: 'SNR (dB)',
+                        font: { size: 14, weight: 'bold' },
+                        color: '#333'
+                    },
+                    grid: { color: 'rgba(0,0,0,0.08)' },
+                    ticks: { color: '#555', font: { size: 12 } }
+                },
+                y: {
+                    title: {
+                        display: true,
+                        text: 'Accuracy (%)',
+                        font: { size: 14, weight: 'bold' },
+                        color: '#333'
+                    },
+                    grid: { color: 'rgba(0,0,0,0.08)' },
+                    ticks: {
+                        color: '#555',
+                        font: { size: 12 },
+                        callback: function(value) {
+                            return value.toFixed(1);
+                        }
+                    },
+                    beginAtZero: false
+                }
+            },
+            plugins: {
+                legend: { display: false },
+                tooltip: {
+                    backgroundColor: 'rgba(0,0,0,0.8)',
+                    titleFont: { size: 13 },
+                    bodyFont: { size: 12 },
+                    padding: 10,
+                    cornerRadius: 6,
+                    callbacks: {
+                        label: function(context) {
+                            return context.dataset.label + ': ' + context.parsed.y.toFixed(2) + '%';
+                        }
+                    }
+                }
+            }
+        }
+    });
+}
+
+// ===== Parse Data =====
+function parseJsonData(raw) {
+    let obj;
+    try {
+        obj = JSON.parse(raw);
+    } catch (e) {
+        alert('JSON parse error: ' + e.message);
+        return null;
+    }
+
+    let snrData = obj;
+    if (obj.snr_results) {
+        snrData = obj.snr_results;
+    }
+
+    // Check if values are in 0-1 range (need to multiply by 100 for percentage)
+    const rawVals = Object.values(snrData).map(Number).filter(v => !isNaN(v));
+    const maxVal = Math.max(...rawVals);
+    const needsConversion = maxVal <= 1.0;
+
+    const points = [];
+    for (const [key, val] of Object.entries(snrData)) {
+        const x = Math.round(Number(key));
+        let y = Number(val);
+        if (!isNaN(x) && !isNaN(y)) {
+            if (needsConversion) y = y * 100; // Convert 0-1 to percentage
+            points.push({ x, y });
+        }
+    }
+
+    points.sort((a, b) => a.x - b.x);
+    return points;
+}
+
+function parseTxtData(raw) {
+    const lines = raw.trim().split('\n');
+    const points = [];
+    for (const line of lines) {
+        const trimmed = line.trim();
+        if (!trimmed) continue;
+        const parts = trimmed.split(',');
+        if (parts.length >= 2) {
+            const x = Math.round(Number(parts[0].trim()));
+            const y = Number(parts[1].trim());
+            if (!isNaN(x) && !isNaN(y)) {
+                points.push({ x, y });
+            }
+        }
+    }
+    points.sort((a, b) => a.x - b.x);
+    return points;
+}
+
+// ===== Add Data =====
+function addData() {
+    const type = document.getElementById('dataType').value;
+    const raw = document.getElementById('dataInput').value.trim();
+    const name = document.getElementById('legendName').value.trim() || ('Dataset ' + (datasets.length + 1));
+
+    if (!raw) {
+        alert('Please paste data first!');
+        return;
+    }
+
+    let points;
+    if (type === 'json') {
+        points = parseJsonData(raw);
+    } else {
+        points = parseTxtData(raw);
+    }
+
+    if (!points || points.length === 0) {
+        alert('No valid data points found. Please check format.');
+        return;
+    }
+
+    const color = COLORS[colorIndex % COLORS.length];
+    colorIndex++;
+
+    datasets.push({
+        label: name,
+        data: points,
+        borderColor: color,
+        backgroundColor: color + '33',
+        borderWidth: 2,
+        pointRadius: 5,
+        pointHoverRadius: 7,
+        pointBackgroundColor: color,
+        pointBorderColor: '#fff',
+        pointBorderWidth: 1.5,
+        showLine: true,
+        fill: false,
+        lineStyle: 'solid',
+        visible: true
+    });
+
+    renderLegendList();
+    updateChart();
+
+    document.getElementById('legendName').value = '';
+    document.getElementById('dataInput').value = '';
+}
+
+// ===== Render Legend List =====
+function renderLegendList() {
+    const list = document.getElementById('legendList');
+    if (datasets.length === 0) {
+        list.innerHTML = '<div style="color:#666; font-size:13px; text-align:center; padding:20px 0;">No data yet. Add data above.</div>';
+        return;
+    }
+
+    list.innerHTML = datasets.map((ds, i) => `
+        <div class="legend-item" data-index="${i}">
+            <div class="legend-item-header">
+                <input type="checkbox" ${ds.visible ? 'checked' : ''} onchange="toggleVisibility(${i}, this.checked)">
+                <span class="color-dot" style="background:${ds.borderColor}"></span>
+                <input type="text" value="${ds.label}" onchange="renameDataset(${i}, this.value)">
+                <button class="btn-remove" onclick="removeDataset(${i})" title="Remove">X</button>
+            </div>
+            <div class="style-row">
+                <span>Color:</span>
+                <input type="color" value="${ds.borderColor}" onchange="changeColor(${i}, this.value)">
+                <span>Line:</span>
+                <select onchange="changeLineStyle(${i}, this.value)">
+                    <option value="solid" ${ds.lineStyle==='solid'?'selected':''}>Solid</option>
+                    <option value="dashed" ${ds.lineStyle==='dashed'?'selected':''}>Dashed</option>
+                    <option value="dotted" ${ds.lineStyle==='dotted'?'selected':''}>Dotted</option>
+                </select>
+                <span>Width:</span>
+                <input type="number" min="1" max="6" value="${ds.borderWidth}" onchange="changeLineWidth(${i}, this.value)">
+                <span>Dots:</span>
+                <input type="number" min="0" max="10" value="${ds.pointRadius}" onchange="changePointRadius(${i}, this.value)">
+            </div>
+        </div>
+    `).join('');
+}
+
+// ===== Legend Operations =====
+function toggleVisibility(index, visible) {
+    datasets[index].visible = visible;
+    updateChart();
+}
+
+function renameDataset(index, name) {
+    datasets[index].label = name;
+    updateChart();
+}
+
+function removeDataset(index) {
+    datasets.splice(index, 1);
+    renderLegendList();
+    updateChart();
+}
+
+function changeColor(index, color) {
+    datasets[index].borderColor = color;
+    datasets[index].backgroundColor = color + '33';
+    datasets[index].pointBackgroundColor = color;
+    renderLegendList();
+    updateChart();
+}
+
+function changeLineStyle(index, style) {
+    datasets[index].lineStyle = style;
+    updateChart();
+}
+
+function changeLineWidth(index, width) {
+    datasets[index].borderWidth = Math.max(1, Math.min(6, Number(width)));
+    updateChart();
+}
+
+function changePointRadius(index, radius) {
+    datasets[index].pointRadius = Math.max(0, Math.min(10, Number(radius)));
+    datasets[index].pointHoverRadius = Math.max(0, Number(radius) + 2);
+    updateChart();
+}
+
+// ===== Line Dash Style =====
+function getBorderDash(ds) {
+    switch (ds.lineStyle) {
+        case 'dashed': return [8, 4];
+        case 'dotted': return [2, 4];
+        default: return [];
+    }
+}
+
+// ===== Update Chart =====
+function updateChart() {
+    const showGrid = document.getElementById('showGrid').checked;
+    const showMarkers = document.getElementById('showMarkers').checked;
+    const xLabel = document.getElementById('xLabel').value;
+    const yLabel = document.getElementById('yLabel').value;
+    const yMin = document.getElementById('yMin').value;
+    const yMax = document.getElementById('yMax').value;
+
+    const visibleDatasets = datasets.filter(ds => ds.visible).map(ds => ({
+        ...ds,
+        borderDash: getBorderDash(ds),
+        pointRadius: showMarkers ? ds.pointRadius : 0,
+        pointHoverRadius: showMarkers ? ds.pointHoverRadius : 0
+    }));
+
+    chart.data.datasets = visibleDatasets;
+
+    chart.options.scales.x.title.text = xLabel;
+    chart.options.scales.y.title.text = yLabel;
+    chart.options.scales.x.grid.display = showGrid;
+    chart.options.scales.y.grid.display = showGrid;
+
+    if (yMin !== '') {
+        chart.options.scales.y.min = Number(yMin);
+    } else {
+        chart.options.scales.y.min = undefined;
+    }
+    if (yMax !== '') {
+        chart.options.scales.y.max = Number(yMax);
+    } else {
+        chart.options.scales.y.max = undefined;
+    }
+
+    chart.options.plugins.legend.display = true;
+    chart.options.plugins.legend.labels = {
+        font: { size: 13 },
+        usePointStyle: true,
+        padding: 16
+    };
+
+    chart.update();
+}
+
+// ===== Clear Operations =====
+function clearInput() {
+    document.getElementById('dataInput').value = '';
+    document.getElementById('legendName').value = '';
+}
+
+function clearAll() {
+    if (datasets.length === 0) return;
+    if (!confirm('Clear all data?')) return;
+    datasets = [];
+    colorIndex = 0;
+    renderLegendList();
+    updateChart();
+}
+
+// ===== Export Image =====
+function exportImage() {
+    const link = document.createElement('a');
+    link.download = 'snr_chart.png';
+    link.href = document.getElementById('snrChart').toDataURL('image/png', 1.0);
+    link.click();
+}
+
+// ===== Toggle hints based on data type =====
+document.getElementById('dataType').addEventListener('change', function() {
+    const jsonHint = document.getElementById('jsonHint');
+    const txtHint = document.getElementById('txtHint');
+    const textarea = document.getElementById('dataInput');
+    if (this.value === 'json') {
+        jsonHint.style.display = 'block';
+        txtHint.style.display = 'none';
+        textarea.placeholder = 'Paste the full result.json content here, e.g.:\n{\n  "model": "xxx",\n  "snr_results": {\n    "-20": 0.095,\n    "-18": 0.096,\n    ...\n  }\n}\n\nThe tool will automatically find "snr_results" and plot it.';
+    } else {
+        jsonHint.style.display = 'none';
+        txtHint.style.display = 'block';
+        textarea.placeholder = 'Paste TXT data, one point per line:\n-19.8, 23.5\n-17.9, 23.8\n-15.9, 25.5\n...';
+    }
+});
+
+// ===== Init =====
+initChart();
+</script>
+</body>
+</html>
