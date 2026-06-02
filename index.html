@@ -316,6 +316,12 @@ The tool will automatically find "snr_results" and plot it.'></textarea>
         </div>
     </div>
 
+    <!-- Statistics Summary -->
+    <h3>Statistics</h3>
+    <div id="statsPanel" style="background:#1a1a3e; border:1px solid #0f3460; border-radius:8px; padding:12px; font-size:12px; color:#b0b0c0;">
+        No data yet.
+    </div>
+
     <!-- Legend List -->
     <h3>Legend Management</h3>
     <div class="legend-list" id="legendList">
@@ -346,6 +352,22 @@ The tool will automatically find "snr_results" and plot it.'></textarea>
                 <span>~</span>
                 <input type="number" id="yMax" placeholder="Auto" style="width:70px;padding:4px;border:1px solid #0f3460;border-radius:4px;background:#0d1b3e;color:#e0e0e0;font-size:12px;" oninput="updateChart()">
             </div>
+        </div>
+    </div>
+
+    <div class="chart-settings" style="margin-top:4px;">
+        <label>Export Background</label>
+        <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+            <label style="font-size:12px; margin:0;">
+                <input type="radio" name="bgColor" value="white" checked> White
+            </label>
+            <label style="font-size:12px; margin:0;">
+                <input type="radio" name="bgColor" value="transparent"> Transparent
+            </label>
+            <label style="font-size:12px; margin:0;">
+                <input type="radio" name="bgColor" value="custom"> Custom
+            </label>
+            <input type="color" id="bgColorPicker" value="#ffffff" style="width:28px;height:24px;border:1px solid #0f3460;border-radius:4px;cursor:pointer;">
         </div>
     </div>
 
@@ -423,14 +445,26 @@ function initChart() {
             plugins: {
                 legend: { display: false },
                 tooltip: {
-                    backgroundColor: 'rgba(0,0,0,0.8)',
-                    titleFont: { size: 13 },
+                    backgroundColor: 'rgba(0,0,0,0.85)',
+                    titleFont: { size: 13, weight: 'bold' },
                     bodyFont: { size: 12 },
-                    padding: 10,
+                    padding: 12,
                     cornerRadius: 6,
+                    displayColors: true,
                     callbacks: {
+                        title: function(context) {
+                            return 'SNR = ' + context[0].parsed.x + ' dB';
+                        },
                         label: function(context) {
                             return context.dataset.label + ': ' + context.parsed.y.toFixed(2) + '%';
+                        },
+                        afterBody: function(context) {
+                            if (context.length > 1) {
+                                const ys = context.map(c => c.parsed.y);
+                                const avg = ys.reduce((a, b) => a + b, 0) / ys.length;
+                                return '---\nAvg: ' + avg.toFixed(2) + '%';
+                            }
+                            return '';
                         }
                     }
                 }
@@ -537,6 +571,7 @@ function addData() {
 
     renderLegendList();
     updateChart();
+    updateStats();
 
     document.getElementById('legendName').value = '';
     document.getElementById('dataInput').value = '';
@@ -591,6 +626,7 @@ function removeDataset(index) {
     datasets.splice(index, 1);
     renderLegendList();
     updateChart();
+    updateStats();
 }
 
 function changeColor(index, color) {
@@ -683,14 +719,82 @@ function clearAll() {
     colorIndex = 0;
     renderLegendList();
     updateChart();
+    updateStats();
 }
 
 // ===== Export Image =====
 function exportImage() {
+    const canvas = document.getElementById('snrChart');
+    const bgOption = document.querySelector('input[name="bgColor"]:checked').value;
+
+    // Create a temporary canvas with background
+    const tempCanvas = document.createElement('canvas');
+    tempCanvas.width = canvas.width;
+    tempCanvas.height = canvas.height;
+    const ctx = tempCanvas.getContext('2d');
+
+    if (bgOption === 'white') {
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(0, 0, tempCanvas.width, tempCanvas.height);
+    } else if (bgOption === 'custom') {
+        const customColor = document.getElementById('bgColorPicker').value;
+        ctx.fillStyle = customColor;
+        ctx.fillRect(0, 0, tempCanvas.width, tempCanvas.height);
+    }
+    // 'transparent' = no fill, just leave as is
+
+    ctx.drawImage(canvas, 0, 0);
+
     const link = document.createElement('a');
     link.download = 'snr_chart.png';
-    link.href = document.getElementById('snrChart').toDataURL('image/png', 1.0);
+    link.href = tempCanvas.toDataURL('image/png', 1.0);
     link.click();
+}
+
+// ===== Statistics =====
+function updateStats() {
+    const panel = document.getElementById('statsPanel');
+    if (datasets.length === 0) {
+        panel.innerHTML = 'No data yet.';
+        return;
+    }
+
+    let html = '';
+    datasets.forEach((ds, i) => {
+        const ys = ds.data.map(p => p.y);
+        const mean = ys.reduce((a, b) => a + b, 0) / ys.length;
+        const min = Math.min(...ys);
+        const max = Math.max(...ys);
+        const variance = ys.reduce((sum, v) => sum + (v - mean) ** 2, 0) / ys.length;
+        const std = Math.sqrt(variance);
+        const n = ys.length;
+
+        html += '<div style="margin-bottom:8px; padding-bottom:8px; border-bottom:1px solid #0f3460;">';
+        html += '<div style="display:flex;align-items:center;gap:6px;margin-bottom:4px;">';
+        html += '<span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:' + ds.borderColor + ';"></span>';
+        html += '<strong style="color:#e0e0e0;">' + ds.label + '</strong>';
+        html += '</div>';
+        html += '<div style="padding-left:16px;">';
+        html += 'Mean: <strong>' + mean.toFixed(2) + '%</strong><br>';
+        html += 'Std: ' + std.toFixed(2) + '% | Min: ' + min.toFixed(2) + '% | Max: ' + max.toFixed(2) + '%<br>';
+        html += 'Points: ' + n;
+        html += '</div></div>';
+    });
+
+    // Overall mean across all visible datasets
+    const visibleDs = datasets.filter(d => d.visible);
+    if (visibleDs.length > 1) {
+        const allMeans = visibleDs.map(ds => {
+            const ys = ds.data.map(p => p.y);
+            return ys.reduce((a, b) => a + b, 0) / ys.length;
+        });
+        const overallMean = allMeans.reduce((a, b) => a + b, 0) / allMeans.length;
+        html += '<div style="margin-top:4px; padding-top:8px; border-top:1px solid #0f3460;">';
+        html += '<strong style="color:#e94560;">Overall Mean (visible): ' + overallMean.toFixed(2) + '%</strong>';
+        html += '</div>';
+    }
+
+    panel.innerHTML = html;
 }
 
 // ===== Toggle hints based on data type =====
